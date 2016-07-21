@@ -12,9 +12,12 @@
 
 + (SRURLCache *)sharedCache;
 
-@property (nonatomic, assign) NSTimeInterval cacheExpireTime;/**<过期时间，当前默认为7天时间*/
+@property (nonatomic, assign, readonly) NSTimeInterval cacheDefaultExpireTime;/**<过期时间，当前默认为7天时间*/
+
 
 - (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData;//保存数据
+- (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData cacheExpireTime:(NSTimeInterval)cacheExpireTime;//保存数据,指定过期时间
+
 - (id)cacheDataWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter;//获取数据
 
 - (void)clearOutdateData;//清空过期缓存数据

@@ -31,6 +31,7 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 
 @property (nonatomic, strong) NSURL *cacheURL;/**<缓存URL*/
 @property (nonatomic, strong) NSDictionary *parameter;/**<参数*/
+@property (nonatomic, assign) NSTimeInterval cacheExpireTime;/**<过期时间，当前默认为7天时间*/
 
 @end
 
@@ -52,13 +53,17 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 - (instancetype)init
 {
     if (self = [super init]) {
-        self.cacheExpireTime = cacheExpire;
-        
+
         NSString *plistPath = [self cachePlistPath];
         NSLog(@"plistPath %@", plistPath);
         _cacheDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
     }
     return self;
+}
+
+- (NSTimeInterval)cacheDefaultExpireTime
+{
+    return cacheExpire;
 }
 
 - (NSString *)cacheKey
@@ -116,7 +121,17 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 
 - (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData
 {
+    self.cacheExpireTime = cacheExpire;
+    
+    [self saveCacheWithURL:cacheURL parameter:parameter cacheData:cacheData cacheExpireTime:self.cacheExpireTime];
+}
+
+- (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData cacheExpireTime:(NSTimeInterval)aCacheExpireTime
+{
+    
+    self.cacheExpireTime = aCacheExpireTime;
     if ([self cacheWithURL:cacheURL parameter:parameter]) {
+
         [self saveCachePlist];
         [self saveCacheData:cacheData];
     }
