@@ -12,6 +12,8 @@
 #import <CommonCrypto/CommonDigest.h>
 
 static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天时间(默认过期时间)，希望通过扩展可以根据不同情况而产生变化
+#define kCacheVersion           @"1.0.0"//默认版本号
+#define kCacheVersionKey        @"version"
 
 #define kCacheCreateTimeKey     @"cacheCreateTime"//缓存记录时间
 #define kCacheEndTimeKey        @"cacheEndTime"//缓存结束时间
@@ -32,7 +34,7 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 @property (nonatomic, strong) NSURL *cacheURL;/**<缓存URL*/
 @property (nonatomic, strong) NSDictionary *parameter;/**<参数*/
 @property (nonatomic, assign) NSTimeInterval cacheExpireTime;/**<过期时间，当前默认为7天时间*/
-
+@property (nonatomic, copy)   NSString *cacheVersion;
 @end
 
 @implementation SRURLCache
@@ -56,7 +58,12 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 
         NSString *plistPath = [self cachePlistPath];
         NSLog(@"plistPath %@", plistPath);
+        
         _cacheDict = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+        
+        if (_cacheDict == nil) {
+            _cacheDict = [NSMutableDictionary dictionary];
+        }
     }
     return self;
 }
@@ -64,6 +71,11 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 - (NSTimeInterval)cacheDefaultExpireTime
 {
     return cacheExpire;
+}
+
+- (NSString *)cacheDefaultVersion
+{
+    return kCacheVersion;
 }
 
 - (NSString *)cacheKey
@@ -129,15 +141,23 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 - (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData cacheExpireTime:(NSTimeInterval)aCacheExpireTime
 {
     
-    self.cacheExpireTime = aCacheExpireTime;
-    if ([self cacheWithURL:cacheURL parameter:parameter]) {
+    [self saveCacheWithURL:cacheURL parameter:parameter cacheData:cacheData cacheExpireTime:aCacheExpireTime cacheVersion:kCacheVersion];
+}
 
+- (void)saveCacheWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheData:(NSDictionary *)cacheData cacheExpireTime:(NSTimeInterval)aCacheExpireTime cacheVersion:(NSString *)aCacheVersion
+{
+    self.cacheExpireTime = aCacheExpireTime;
+    self.cacheVersion = aCacheVersion;
+    
+    if ([self cacheWithURL:cacheURL parameter:parameter]) {
+        
         [self saveCachePlist];
         [self saveCacheData:cacheData];
     }
     else {
         NSLog(@"输入url为空，不进行保存数据");
     }
+    
 }
 
 #pragma mark - 保存缓存相关数据到字典
@@ -147,6 +167,7 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
                                 [NSDate date], kCacheCreateTimeKey,
                                 [NSDate dateWithTimeIntervalSinceNow:self.cacheExpireTime], kCacheEndTimeKey,
                                 self.cacheKey, kCachePathKey,
+                                self.cacheVersion, kCacheVersionKey,
                                 nil];
     [_cacheDict setObject:cacheDict forKey:self.cacheKey];
     
@@ -194,18 +215,23 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
 
 - (id)cacheDataWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter
 {
-    if ([self cacheWithURL:cacheURL parameter:parameter]) {
+    return [self cacheDataWithURL:cacheURL parameter:parameter cacheVersion:kCacheVersion];
+}
 
+- (id)cacheDataWithURL:(NSURL *)cacheURL parameter:(NSDictionary *)parameter cacheVersion:(NSString *)aCacheVersion
+{
+    if ([self cacheWithURL:cacheURL parameter:parameter]) {
+        
         NSDictionary *cacheDict = [_cacheDict objectForKey:self.cacheKey];
         if (cacheDict) {
-
+            
             NSDate *cacheDate = [cacheDict objectForKey:kCacheEndTimeKey];
             NSString *cachePath = [[self cacheFileRootPath] stringByAppendingPathComponent:[cacheDict objectForKey:kCachePathKey]];
-            
-            if ([[NSDate date] timeIntervalSinceDate:cacheDate] > 0) {
-                NSLog(@"缓存过期");
-            }
-            else {
+            NSString *cacheDataVersion = [cacheDict objectForKey:kCacheVersionKey];
+
+            if ([cacheDataVersion isEqualToString:aCacheVersion] &&
+                [[NSDate date] timeIntervalSinceDate:cacheDate] < 0) {//版本相同并未过期
+                
                 NSLog(@"缓存未过期");
                 NSFileManager *fileManager = [NSFileManager defaultManager];
                 
@@ -215,10 +241,15 @@ static const NSTimeInterval cacheExpire = 60 * 60 * 24 * 7;//只缓存大概7天
                 else {
                     NSLog(@"保存文件不存在");
                 }
+                
             }
+            else {
+                NSLog(@"缓存过期或者缓存版本号不对");
+            }
+
         }
     }
-
+    
     return nil;
 }
 
